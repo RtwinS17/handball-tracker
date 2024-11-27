@@ -3,14 +3,32 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
 const mariadb = require('mariadb');
+const childrenRoutes = require('./routes/children');
+const trainingsRoutes = require('./routes/trainings');
+const attendanceRoutes = require('./routes/attendance');
+const exercisesRoutes = require('./routes/exercises');
+
+BigInt.prototype.toJSON = function () {
+    return this.toString();
+  };
+  
 
 
 //Initialiser l'application express
 const app = express();
 
 //Middleware
+
 app.use(cors()); //Permet à l'API d'être accessible depuis n'importe quelle origine
-app.use(bodyParser.json()); //Permet de parser les requêtes de type application/json
+app.use(express.json());//Permet de parser les requêtes de type application/json
+
+// Logger la requête après le parsing JSON
+app.use((req, res, next) => {
+    console.log('Requête reçue :', req.method, req.url);
+    console.log('Corps de la requête :', req.body);
+    next();
+  });
+  
 
 //Connexion à la base de données
 const pool = mariadb.createPool({
@@ -29,6 +47,11 @@ pool.getConnection()
     })
     .catch(err => console.error('Erreur de connexion à la base de données :', err));
 
+//Routes
+app.use('/api/children', childrenRoutes);
+app.use('/api/trainings', trainingsRoutes);
+app.use('/api/attendance', attendanceRoutes);
+app.use('/api/exercises', exercisesRoutes);
 
 //Route par défaut
 app.get('/', (req, res) => {
