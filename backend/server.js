@@ -1,68 +1,54 @@
 require('dotenv').config();
 const express = require('express');
-const bodyParser = require('body-parser');
 const cors = require('cors');
-const mariadb = require('mariadb');
 const childrenRoutes = require('./routes/children');
-const trainingsRoutes = require('./routes/trainings');
 const attendanceRoutes = require('./routes/attendance');
 const exercisesRoutes = require('./routes/exercises');
+const trainingsRoutes = require('./routes/trainings');
+
+const app = express();
+
+app.use(cors());
+app.use(express.json());
 
 BigInt.prototype.toJSON = function () {
     return this.toString();
   };
-  
 
-
-//Initialiser l'application express
-const app = express();
-
-//Middleware
-
-app.use(cors()); //Permet à l'API d'être accessible depuis n'importe quelle origine
-app.use(express.json());//Permet de parser les requêtes de type application/json
-
-// Logger la requête après le parsing JSON
-app.use((req, res, next) => {
-    console.log('Requête reçue :', req.method, req.url);
-    console.log('Corps de la requête :', req.body);
-    next();
-  });
-  
-
-//Connexion à la base de données
-const pool = mariadb.createPool({
-    host: process.env.DB_HOST,
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    database: process.env.DB_NAME,
-    connectionLimit: 5
-});
-
-//Vérifier la connexion à la base de données
-pool.getConnection()
-    .then(conn => {
-        console.log('Connecté à la base de données !');
-        conn.release();
-    })
-    .catch(err => console.error('Erreur de connexion à la base de données :', err));
-
-//Routes
+// Enregistrement des routes avec préfixes
 app.use('/api/children', childrenRoutes);
-app.use('/api/trainings', trainingsRoutes);
 app.use('/api/attendance', attendanceRoutes);
 app.use('/api/exercises', exercisesRoutes);
+app.use('/api/trainings', trainingsRoutes);
 
-//Route par défaut
-app.get('/', (req, res) => {
-    res.json({ message: 'Bienvenue sur l\'api Handball Tracker !' });
+// Middleware pour afficher toutes les routes
+app.get('/api/routes', (req, res) => {
+  const routes = [];
+  app._router.stack.forEach((middleware) => {
+    if (middleware.route) {
+      // Ajouter les méthodes HTTP et chemins
+      const methods = Object.keys(middleware.route.methods).join(', ').toUpperCase();
+      routes.push({ methods, path: middleware.route.path });
+    } else if (middleware.name === 'router' && middleware.handle.stack) {
+      // Gérer les sous-routeurs
+      middleware.handle.stack.forEach((layer) => {
+        if (layer.route) {
+          const methods = Object.keys(layer.route.methods).join(', ').toUpperCase();
+          routes.push({ methods, path: `${middleware.regexp.source.replace(/\\\//g, '/')}${layer.route.path}` });
+        }
+      });
+    }
+  });
+  res.json(routes);
 });
 
-// Lancer le serveur
+// Route par défaut
+app.get('/', (req, res) => {
+  res.json({ message: 'Bienvenue sur l\'API Handball Tracker !' });
+});
+
+// Démarrer le serveur
 const port = process.env.PORT || 5000;
 app.listen(port, () => {
-    console.log(`Serveur lancé sur http://localhost:${port}`);
-} //Affiche un message dans la console
-
-);
-
+  console.log(`Serveur lancé sur http://localhost:${port}`);
+});
